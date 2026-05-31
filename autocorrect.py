@@ -1,5 +1,6 @@
 from preprocess import load_corpus, tokenize, build_word_frequency
 from collections import Counter
+from ngram_model import BIGRAM_MODEL, bigram_probability
 
 # Load corpus once at import time 
 _text     = load_corpus()
@@ -52,12 +53,34 @@ def correct_word(word):
         return word   # already correct
     return max(candidates(word), key=probability)
 
+# Context-aware sentence correction 
 def correct_sentence(sentence):
-    """Correct every word in a sentence."""
-    words = sentence.strip().split()
-    return ' '.join(correct_word(w) for w in words)
+    """Correct each word using bigram context from previous word."""
+    words  = sentence.strip().split()
+    result = []
 
-# Quick test
+    for i, word in enumerate(words):
+        word = word.lower()
+        if word in VOCAB:
+            result.append(word)
+            continue
+
+        cands   = candidates(word)
+        prev    = result[-1] if result else None
+
+        if prev:
+            # rank by bigram probability given previous word
+            best = max(cands, key=lambda w: bigram_probability(
+                w, prev, BIGRAM_MODEL, WORD_FREQ, TOTAL
+            ))
+        else:
+            # first word — use unigram probability
+            best = max(cands, key=probability)
+
+        result.append(best)
+
+    return ' '.join(result)
+
 if __name__ == "__main__":
     tests = ["speling", "korrect", "waht", "hte wrold", "I hav a dreem"]
     for t in tests:
