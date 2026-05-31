@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Autocorrect Tool</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <div class="container">
+
+    <div class="header">
+      <h1>✍️ Autocorrect Tool</h1>
+      <p>Powered by Edit Distance + N-gram Language Model</p>
+    </div>
+
+    <div class="card">
+      <label for="inputText">Enter your text:</label>
+      <textarea id="inputText" rows="5"
+        placeholder="Tpye somthing heer and see the magic..."></textarea>
+
+      <div class="btn-row">
+        <button id="correctBtn" onclick="correctText()">correct text</button>
+        <button id="clearBtn" onclick="clearAll()">clear</button>
+      </div>
+    </div>
+
+    <div class="card result-card" id="resultCard" style="display:none;">
+      <label>Corrected Text:</label>
+      <div id="correctedText" class="corrected-box"></div>
+
+      <div id="changesSection" style="display:none;">
+        <label>Changes Made:</label>
+        <div id="changesList" class="changes-list"></div>
+      </div>
+    </div>
+
+    <div id="errorBox" class="error-box" style="display:none;"></div>
+
+    <div class="loader" id="loader" style="display:none;">
+      <div class="spinner"></div>
+      <span>Analyzing...</span>
+    </div>
+
+  </div>
+
+  <script>
+    async function correctText() {
+      const text = document.getElementById("inputText").value.trim();
+      if (!text) return;
+
+      showLoader(true);
+      hideError();
+      document.getElementById("resultCard").style.display = "none";
+
+      try {
+        const res = await fetch("/correct", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text })
+        });
+
+        const data = await res.json();
+        showLoader(false);
+
+        if (data.error) { showError(data.error); return; }
+
+        // Show corrected text
+        document.getElementById("correctedText").textContent = data.corrected;
+        document.getElementById("resultCard").style.display = "block";
+
+        // Show changes
+        const changesList = document.getElementById("changesList");
+        const changesSection = document.getElementById("changesSection");
+        changesList.innerHTML = "";
+
+        if (data.changes.length === 0) {
+          changesSection.style.display = "none";
+          changesList.innerHTML = "<span class='no-changes'>No corrections needed!</span>";
+          changesSection.style.display = "block";
+        } else {
+          data.changes.forEach(c => {
+            const chip = document.createElement("div");
+            chip.className = "change-chip";
+            chip.innerHTML = `<span class="wrong">${c.original}</span>
+                              <span class="arrow">→</span>
+                              <span class="fixed">${c.corrected}</span>`;
+            changesList.appendChild(chip);
+          });
+          changesSection.style.display = "block";
+        }
+
+      } catch (err) {
+        showLoader(false);
+        showError("Something went wrong. Is the server running?");
+      }
+    }
+
+    function clearAll() {
+      document.getElementById("inputText").value = "";
+      document.getElementById("resultCard").style.display = "none";
+      hideError();
+    }
+
+    function showLoader(show) {
+      document.getElementById("loader").style.display = show ? "flex" : "none";
+    }
+
+    function showError(msg) {
+      const box = document.getElementById("errorBox");
+      box.textContent = msg;
+      box.style.display = "block";
+    }
+
+    function hideError() {
+      document.getElementById("errorBox").style.display = "none";
+    }
+
+    // Allow Ctrl+Enter to submit
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("inputText").addEventListener("keydown", e => {
+        if (e.ctrlKey && e.key === "Enter") correctText();
+      });
+    });
+  </script>
+
+</body>
+</html>
